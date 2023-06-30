@@ -1,77 +1,84 @@
-use std::env;
-use std::ffi::OsString;
-use std::{collections::HashMap, error::Error, io, process};
+use std::{collections::HashMap, error::Error, process};
 
 use import_csv::request::request::PromisseSankhya;
 
-use import_csv::schemas::builder_config::BuilderConfig;
-use import_csv::schemas::login_ret_schema::AccessData;
+use import_csv::schemas::builder_config::EnvConfig;
 use import_csv::schemas::save_record_ret_schema::SaveRecordResponse;
 use import_csv::schemas::save_record_schema::{
     DataRow, DataSet, Entity, Fieldset, RequestBody, SaveRecord,
 };
+
 use import_csv::schemas::spreedsheet_schema::Spreedsheet;
-use import_csv::utils::resolve_param::get_params;
+use import_csv::utils::resolve_param::build_cli;
 use import_csv::utils::string_utils::get_external_json;
 use serde_json::Value;
 
 #[tokio::main]
 async fn main() {
-    // let results = example();
-    // if let Err(err) = results {
-    //     println!("error running example: {}", err);
-    //     process::exit(1);
-    // }
+    let configs = get_config_file();
 
+    let config_json = get_external_json(&configs.config_file);
 
-    // let jsons = results.unwrap();
+    let env_config: EnvConfig = serde_json::from_str(&config_json).unwrap();
 
-    // let promisse = PromisseSankhya::new(
-    //     "http://sankhyaceara.nuvemdatacom.com.br:9199".to_string(),
-    //     AccessData {
-    //         password: "u#AdnwB4".to_string(),
-    //         username: "sup".to_string(),
-    //     },
-    // )
-    // .await;
-    // use std::time::Instant;
-    // let now = Instant::now();
-    // let a = match promisse
-    //     .save_all::<SaveRecord, SaveRecordResponse>(jsons)
-    //     .await
-    // {
-    //     Ok(res) => res,
-    //     Err(err) => {
-    //         println!("{}", err);
-    //         return;
-    //     }
-    // };
-    // let mut size = a.len();
+    let results = read_spreedsheet(configs.import_file, &env_config.entity);
+    if let Err(err) = results {
+        println!("error running read_spreedsheet: {}", err);
+        process::exit(1);
+    }
 
-    // let file_path = get_first_arg().unwrap();
-    // let mut wtr = csv::Writer::from_path(file_path).expect("Could'nt create log");
-    // for (line, res) in &a {
-    //     if res.status_message.is_some() {
-    //         size = size - 1;
-    //         wtr.write_record(&[
-    //             line.to_string(),
-    //             res.status_message.as_ref().unwrap().clone(),
-    //         ])
-    //         .expect("Error writing log");
-    //     }
-    // }
-    // let elapsed = now.elapsed();
-    // println!("Parallel elapsed: {:.2?}", elapsed);
+    let jsons = results.unwrap();
+    println!("Valid lines to import: {}", &jsons.len());
 
-    // println!("Included: {}, error/warning in: {}", size, a.len() - size)
-    get_params()
+    let promisse = PromisseSankhya::new(env_config.clone()).await;
+    println!("Instanced PromisseSankhya with config:{:?}", env_config);
+    use std::time::Instant;
+    let now = Instant::now();
+    let save_all_results = match promisse
+        .save_all::<SaveRecord, SaveRecordResponse>(jsons)
+        .await
+    {
+        Ok(res) => res,
+        Err(err) => {
+            println!("{}", err);
+            return;
+        }
+    };
+    let mut size = save_all_results.len();
+
+    let file_path = configs.log_file;
+    println!("Creating log file...");
+    let mut wtr = csv::Writer::from_path(file_path).expect("Could'nt create log");
+    println!("Writing log file...");
+    for (line, res) in &save_all_results {
+        if res.status_message.is_some() {
+            size = size - 1;
+            wtr.write_record(&[
+                line.to_string(),
+                res.status_message.as_ref().unwrap().clone(),
+            ])
+            .expect("Error writing log");
+        }
+    }
+    println!("Log file finished..");
+    let elapsed = now.elapsed();
+    println!("Parallel elapsed: {:.2?}", elapsed);
+
+    println!(
+        "Included: {}, error/warning in: {}",
+        size,
+        save_all_results.len() - size
+    );
 }
 
-fn example() -> Result<Vec<SaveRecord>, Box<dyn Error>> {
+fn read_spreedsheet(csv_path: String, entity: &String) -> Result<Vec<SaveRecord>, Box<dyn Error>> {
+    println!("Received path: {csv_path}");
     let mut rdr = csv::ReaderBuilder::new()
         .delimiter(b';')
         .flexible(true)
-        .from_reader(io::stdin());
+        .from_path(csv_path)
+        .expect("Cannot find file {csv_path}");
+    println!("Processing file...");
 
     let mut headers: Vec<String> = vec![];
     {
@@ -79,10 +86,11 @@ fn example() -> Result<Vec<SaveRecord>, Box<dyn Error>> {
             headers.push(ele.to_string())
         }
     }
-
     let records = rdr.deserialize::<Spreedsheet>();
+    println!("Deserializing rows...");
     let mut tuples: Vec<(String, Value)> = vec![];
     let mut bodies = vec![];
+    println!("Creating tuples...");
     for (i, result) in records.enumerate() {
         let a = format!("cannot get line:{}", i);
         let row = result.expect(a.as_str());
@@ -91,9 +99,10 @@ fn example() -> Result<Vec<SaveRecord>, Box<dyn Error>> {
         for (key, value) in object.as_object().unwrap() {
             tuples.push((key.to_string(), value.to_owned()));
         }
-        bodies.push(generate_body(&tuples, "Parceiro".to_string()));
+        bodies.push(generate_body(&tuples, entity.to_string()));
         tuples.clear();
     }
+    println!("Tuples created");
 
     Ok(bodies)
 }
@@ -140,24 +149,23 @@ fn generate_body(tuples: &Vec<(String, Value)>, entity: String) -> SaveRecord {
     }
 }
 
-fn get_first_arg() -> Result<OsString, Box<dyn Error>> {
-    match env::args_os().nth(1) {
-        None => Ok(OsString::from("log.csv")),
-        Some(file_path) => Ok(file_path),
+fn get_config_file() -> ReceivedArgs {
+    let command = build_cli();
+    let matches = command.clone().get_matches();
+
+    let log_file = matches.get_one::<String>("log").unwrap().to_owned();
+    let import_file = matches.get_one::<String>("name").unwrap().to_owned();
+    let config_file = matches.get_one::<String>("config").unwrap().to_owned();
+
+    ReceivedArgs {
+        config_file,
+        log_file,
+        import_file,
     }
 }
 
-fn get_config_file() -> Result<BuilderConfig, Box<dyn Error>> {
-    let args: Vec<String> = env::args().collect();
-    let path = args.get(1);
-    let mut build_conf_path = "./build.json".to_owned();
-    if path.is_some() {
-        build_conf_path = path.unwrap().to_owned();
-    }
-
-    let config_json = get_external_json(&build_conf_path);
-
-    let config: BuilderConfig = serde_json::from_str(&config_json).unwrap();
-
-    Ok(config)
+struct ReceivedArgs {
+    pub log_file: String,
+    pub config_file: String,
+    pub import_file: String,
 }

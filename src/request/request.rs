@@ -8,7 +8,7 @@ use crate::{
         login::{login, LoginRet},
         logout::logout,
     },
-    schemas::login_ret_schema::AccessData,
+    schemas::{builder_config::EnvConfig, login_ret_schema::AccessData},
 };
 
 pub struct PromisseSankhya {
@@ -17,10 +17,17 @@ pub struct PromisseSankhya {
 }
 
 impl PromisseSankhya {
-    pub async fn new(url: String, access_data: AccessData) -> PromisseSankhya {
-        let login_ret = login(&url, access_data).await;
+    pub async fn new(env: EnvConfig) -> PromisseSankhya {
+        let login_ret = login(
+            &env.url,
+            AccessData {
+                username: env.username,
+                password: env.password,
+            },
+        )
+        .await;
         Self {
-            url,
+            url: env.url,
             login_ret: login_ret.unwrap(),
         }
     }

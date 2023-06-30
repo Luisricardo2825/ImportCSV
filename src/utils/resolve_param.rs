@@ -1,17 +1,24 @@
-use std::env;
+use clap::{arg, command, value_parser, Command};
 
-pub fn get_params() {
-    let mut args: Vec<String> = env::args().collect();
-    args.remove(0);
-    for ele in args.chunks(2) {
-        println!("{:?}", ele);
-        if ele.len() >= 2 {
-            let arg = ele.get(0).unwrap();
-            if arg.contains("--") {
-                let arg_value = ele.get(1).unwrap();
-                println!("a: {} - b: {}", ele.get(0).unwrap(),);
-            }
-        }
-        println!("{:?}", ele);
-    }
+pub fn build_cli() -> Command {
+    command!() // requires `cargo` feature
+        .arg(arg!([name] "CSV file to import").required(true))
+        .arg(
+            arg!(
+                -c --config <FILE> "Sets a custom config file"
+            )
+            // We don't have syntax yet for optional options, so manually calling `required`
+            .required(false)
+            .value_parser(value_parser!(String))
+            .default_value("conf.json"),
+        )
+        .arg(
+            arg!(
+                -l --log <FILE> "Sets a log file"
+            )
+            // We don't have syntax yet for optional options, so manually calling `required`
+            .required(false)
+            .value_parser(value_parser!(String))
+            .default_value("log.csv"),
+        )
 }
