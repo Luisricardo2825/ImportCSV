@@ -1,6 +1,7 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, time::Duration};
 
 use futures::{executor, future::join_all};
+use indicatif::{ProgressBar, ProgressStyle};
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
@@ -35,6 +36,25 @@ impl PromisseSankhya {
         &self,
         jsons: Vec<C>,
     ) -> Result<Vec<(i32, T)>, Box<reqwest::Error>> {
+        let pb = ProgressBar::new_spinner();
+        pb.set_message("Inserting...");
+
+        pb.enable_steady_tick(Duration::from_millis(120));
+        pb.set_style(
+            ProgressStyle::with_template("{msg} {spinner:.blue}")
+                .unwrap()
+                // For more spinners check out the cli-spinners project:
+                // https://github.com/sindresorhus/cli-spinners/blob/master/spinners.json
+                .tick_strings(&[
+                    "▹▹▹▹▹",
+                    "▸▹▹▹▹",
+                    "▹▸▹▹▹",
+                    "▹▹▸▹▹",
+                    "▹▹▹▸▹",
+                    "▹▹▹▹▸",
+                    "▪▪▪▪▪",
+                ]),
+        );
         let mut requests = vec![];
         let LoginRet { client, root } = &self.login_ret;
         let jsession_token = String::from(&root.response_body.jsessionid.field); // Pega o jsession ID
@@ -56,21 +76,25 @@ impl PromisseSankhya {
         let mut bulk_responses = vec![];
         for ele in responses {
             if ele.is_ok() {
-                bulk_responses.push(ele.unwrap().json::<T>());
+                pb.set_message("Parsing responses...");
+                let strval = ele.unwrap().text().await.unwrap();
+                let json: T = serde_json::from_str(strval.as_str()).expect("Error Deserializing");
+                bulk_responses.push(json);
             }
         }
-        let jsons = join_all(bulk_responses).await;
+        let jsons = bulk_responses;
         let mut responses: Vec<(i32, T)> = vec![];
         let mut count = 1;
         for ele in jsons {
-            if ele.is_err() {
-                let a = Err::<Vec<(i32, T)>, Box<reqwest::Error>>(Box::new(ele.err().unwrap()));
-                return a;
-            }
-            responses.push((count, ele.unwrap()));
+            // if ele.is_err() {
+            //     let a = Err::<Vec<(i32, T)>, Box<reqwest::Error>>(Box::new(ele.err().unwrap()));
+            //     return a;
+            // }
+            responses.push((count, ele));
             count = count + 1;
         }
-
+        let msg = format!("Imported {} rows", count - 1);
+        pb.finish_with_message(msg);
         Ok(responses)
     }
 

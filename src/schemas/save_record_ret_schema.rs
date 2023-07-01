@@ -10,12 +10,19 @@ pub struct SaveRecordResponse {
     pub transaction_id: Option<String>,
     pub response_body: Option<ResponseBody>,
     pub status_message: Option<String>,
+    pub ts_error: Option<TsError>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TsError {
+    pub ts_error_code: String,
+    pub ts_error_level: String,
+}
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ResponseBody {
-    pub entities: Entities,
+    pub entities: Option<Entities>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

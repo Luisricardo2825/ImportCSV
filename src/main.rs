@@ -1,5 +1,6 @@
 use std::{collections::HashMap, error::Error, process};
 
+use console::style;
 use import_csv::request::request::PromisseSankhya;
 
 use import_csv::schemas::builder_config::EnvConfig;
@@ -31,7 +32,10 @@ async fn main() {
     println!("Valid lines to import: {}", &jsons.len());
 
     let promisse = PromisseSankhya::new(env_config.clone()).await;
-    println!("Instanced PromisseSankhya with config:{:?}", env_config);
+    println!(
+        "Instanced PromisseSankhya with config:({},{},{})",
+        env_config.entity, env_config.username, env_config.url
+    );
     use std::time::Instant;
     let now = Instant::now();
     let save_all_results = match promisse
@@ -72,13 +76,13 @@ async fn main() {
 }
 
 fn read_spreedsheet(csv_path: String, entity: &String) -> Result<Vec<SaveRecord>, Box<dyn Error>> {
-    println!("Received path: {csv_path}");
+    println!("{} {csv_path}",style("[0] Received path:").green().bold());
     let mut rdr = csv::ReaderBuilder::new()
         .delimiter(b';')
         .flexible(true)
         .from_path(csv_path)
         .expect("Cannot find file {csv_path}");
-    println!("Processing file...");
+    println!("{}", style("[1] Processing file...").bold().cyan().dim());
 
     let mut headers: Vec<String> = vec![];
     {
@@ -86,11 +90,13 @@ fn read_spreedsheet(csv_path: String, entity: &String) -> Result<Vec<SaveRecord>
             headers.push(ele.to_string())
         }
     }
+
     let records = rdr.deserialize::<Spreedsheet>();
-    println!("Deserializing rows...");
+    println!("{}", style("[2] Deserializing rows...").bold().cyan().dim());
     let mut tuples: Vec<(String, Value)> = vec![];
     let mut bodies = vec![];
-    println!("Creating tuples...");
+    println!("{}",style("[3] Creating tuples...").bold().cyan().dim());
+
     for (i, result) in records.enumerate() {
         let a = format!("cannot get line:{}", i);
         let row = result.expect(a.as_str());
@@ -99,10 +105,11 @@ fn read_spreedsheet(csv_path: String, entity: &String) -> Result<Vec<SaveRecord>
         for (key, value) in object.as_object().unwrap() {
             tuples.push((key.to_string(), value.to_owned()));
         }
-        bodies.push(generate_body(&tuples, entity.to_string()));
+        let json_body = generate_body(&tuples, entity.to_string());
+        bodies.push(json_body);
         tuples.clear();
     }
-    println!("Tuples created");
+    println!("[5] Tuples created");
 
     Ok(bodies)
 }
