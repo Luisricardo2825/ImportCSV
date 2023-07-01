@@ -31,14 +31,24 @@ fn generate_log(
     save_all_results: &Vec<(i32, SaveRecordResponse)>,
 ) -> usize {
     let pb = SpinnerBuilder::new(style("Creating log file...").green().bold().to_string());
-    let mut size = save_all_results.len();
+    let mut size: usize = save_all_results.len();
 
     let file_path = &configs.log_file;
-    let mut wtr = csv::Writer::from_path(file_path).expect("Could'nt create log");
+
+    let mut wtr = csv::WriterBuilder::new()
+        .delimiter(b';')
+        .from_path(file_path)
+        .expect("Could'nt create log");
 
     pb.set_message(style("Writing log file...").cyan().bold().to_string());
+    let mut first = true;
     for (line, res) in save_all_results {
         if res.status_message.is_some() {
+            if first {
+                wtr.write_record(&["Line", "Error"])
+                    .expect("Error writing headers");
+                first = false;
+            }
             size = size - 1;
             let row = [
                 line.to_string(),
@@ -64,14 +74,22 @@ fn generate_log(
                         row.push(ele.1);
                     }
                 }
-            };
-            let first = true;
-            for field in row {
-                if first {
-                    let bulk_row = field.as_object().unwrap();
-                    let headers: Vec<String> = bulk_row.keys().map(|x| x.to_owned()).collect();
-                    wtr.write_record(headers).expect("Cannot write headers");
+                if let Some(pk) = body.pk {
+                    row.push(serde_json::to_value(pk).unwrap());
                 }
+            }
+
+            if first {
+                let mut headers: Vec<String> = vec![];
+                row.clone().into_iter().for_each(|field| {
+                    let bulk_row = field.as_object().unwrap();
+                    bulk_row.keys().for_each(|x| headers.push(x.to_owned()))
+                });
+                wtr.write_record(headers).expect("Error writing headers");
+                first = false;
+            }
+
+            for field in row {
                 for (_, value) in field.as_object().unwrap() {
                     let val = value.get("$");
                     if val.is_some() {
@@ -79,7 +97,7 @@ fn generate_log(
                         wtr.write_field(str_s).expect("Error writing");
                     }
                 }
-                wtr.write_field("\n").expect("Error writing");
+                wtr.write_record(None::<&[u8]>).expect("Error writing");
             }
             // match wtr.write_record(&row) {
             //     Err(err) => {
@@ -102,6 +120,7 @@ fn generate_log(
     ));
     size
 }
+
 async fn pedido_template(configs: ReceivedArgs, promisse: &PromisseSankhya, entity: &String) {
     let results =
         SpreedsheetWorker::new(&configs.import_file, entity, Types::PEDIDO).read_spreedsheet_ped();

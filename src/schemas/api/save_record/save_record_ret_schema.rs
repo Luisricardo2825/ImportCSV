@@ -26,6 +26,22 @@ pub struct TsError {
 #[serde(rename_all = "camelCase")]
 pub struct ResponseBody {
     pub entities: Option<Entities>,
+    // pub entities: Option<Entities>,
+    pub pk: Option<Pk>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Pk {
+    #[serde(rename = "NUNOTA")]
+    pub nunota: Nunota,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Nunota {
+    #[serde(rename = "$")]
+    pub field: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -35,4 +51,3 @@ pub struct Entities {
     #[serde(flatten)]
     pub entity: HashMap<String, Value>,
 }
-
