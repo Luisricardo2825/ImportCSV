@@ -2,39 +2,51 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct LoginRequestBody {
+pub struct LoginResponseBody {
     pub service_name: String,
-    pub request_body: RequestBody,
+    pub status: String,
+    pub pending_printing: String,
+    pub transaction_id: String,
+    pub response_body: ResponseBody,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RequestBody {
-    #[serde(rename = "NOMUSU")]
-    pub nomusu: Nomusu,
-    #[serde(rename = "INTERNO")]
-    pub interno: Interno,
-    #[serde(rename = "KEEPCONNECTED")]
-    pub keepconnected: Keepconnected,
+pub struct ResponseBody {
+    #[serde(rename = "callID")]
+    pub call_id: CallId,
+    pub jsessionid: Jsessionid,
+    #[serde(rename = "kID")]
+    pub k_id: Option<KId>,
+    pub idusu: Idusu,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Nomusu {
+pub struct CallId {
     #[serde(rename = "$")]
     pub field: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Interno {
+pub struct Jsessionid {
     #[serde(rename = "$")]
     pub field: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Keepconnected {
+pub struct KId {
     #[serde(rename = "$")]
     pub field: String,
 }
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Idusu {
+    #[serde(rename = "$")]
+    pub field: String,
+}
+
+

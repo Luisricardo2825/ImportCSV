@@ -1,6 +1,30 @@
+pub struct Cli;
+
+impl Cli {
+    pub fn new() -> ReceivedArgs {
+        let command = build_cli();
+        let matches = command.clone().get_matches();
+
+        let log_file = matches.get_one::<String>("log").unwrap().to_owned();
+        let import_file = matches.get_one::<String>("name").unwrap().to_owned();
+        let config_file = matches.get_one::<String>("config").unwrap().to_owned();
+
+        ReceivedArgs {
+            config_file,
+            log_file,
+            import_file,
+        }
+    }
+}
+pub struct ReceivedArgs {
+    pub log_file: String,
+    pub config_file: String,
+    pub import_file: String,
+}
+
 use clap::{arg, command, value_parser, Command};
 
-pub fn build_cli() -> Command {
+fn build_cli() -> Command {
     command!() // requires `cargo` feature
         .arg(arg!([name] "CSV file to import").required(true))
         .arg(

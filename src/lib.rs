@@ -1,5 +1,6 @@
 pub mod api;
-pub mod auth;
-pub mod request;
+pub mod cli;
+pub mod core;
 pub mod schemas;
+pub mod ui;
 pub mod utils;

@@ -1,9 +1,8 @@
 use reqwest::Client;
 use std::error::Error;
 
-use crate::schemas::{
-    login_req_schema::{Interno, LoginRequestBody, Nomusu},
-    login_ret_schema::AccessData,
+use crate::schemas::api::auth::login_req_schema::{
+    AccessData, Interno, LoginRequestBody, Nomusu, RequestBody,
 };
 
 pub async fn post_login(
@@ -18,7 +17,7 @@ pub async fn post_login(
     let AccessData { username, password } = access_data;
 
     let json = LoginRequestBody {
-        request_body: crate::schemas::login_req_schema::RequestBody {
+        request_body: RequestBody {
             nomusu: Nomusu { field: username },
             interno: Interno { field: password },
             ..Default::default()

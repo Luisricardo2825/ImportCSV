@@ -1,15 +1,16 @@
-use std::{fmt::Debug, time::Duration};
+use std::fmt::Debug;
 
+use console::style;
 use futures::{executor, future::join_all};
-use indicatif::{ProgressBar, ProgressStyle};
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    auth::{
+    api::auth::{
         login::{login, LoginRet},
         logout::logout,
     },
-    schemas::{builder_config::EnvConfig, login_ret_schema::AccessData},
+    schemas::{api::auth::login_req_schema::AccessData, config::builder_config::EnvConfig},
+    ui::spinner::SpinnerBuilder,
 };
 
 pub struct PromisseSankhya {
@@ -36,25 +37,8 @@ impl PromisseSankhya {
         &self,
         jsons: Vec<C>,
     ) -> Result<Vec<(i32, T)>, Box<reqwest::Error>> {
-        let pb = ProgressBar::new_spinner();
-        pb.set_message("Inserting...");
+        let pb = SpinnerBuilder::new("Inserting...");
 
-        pb.enable_steady_tick(Duration::from_millis(120));
-        pb.set_style(
-            ProgressStyle::with_template("{msg} {spinner:.blue}")
-                .unwrap()
-                // For more spinners check out the cli-spinners project:
-                // https://github.com/sindresorhus/cli-spinners/blob/master/spinners.json
-                .tick_strings(&[
-                    "▹▹▹▹▹",
-                    "▸▹▹▹▹",
-                    "▹▸▹▹▹",
-                    "▹▹▸▹▹",
-                    "▹▹▹▸▹",
-                    "▹▹▹▹▸",
-                    "▪▪▪▪▪",
-                ]),
-        );
         let mut requests = vec![];
         let LoginRet { client, root } = &self.login_ret;
         let jsession_token = String::from(&root.response_body.jsessionid.field); // Pega o jsession ID
@@ -67,16 +51,39 @@ impl PromisseSankhya {
             post_url = format!("{}{}{}", &self.url, &endpoint, &jsession_token);
             // Formata a url para usar o token
         }
-        for ele in jsons {
+        let total_requests = jsons.len();
+        for (idx, ele) in jsons.into_iter().enumerate() {
+            pb.set_message(format!(
+                "{}: {}/{total_requests}",
+                style("Adding request").cyan().bold().dim().to_string(),
+                idx + 1
+            ));
             let resp = client.post(&post_url).json(&ele).send();
             requests.push(resp);
         }
-
+        pb.set_message(format!(
+            "{}",
+            style("Calling SaveRecord API...")
+                .cyan()
+                .bold()
+                .dim()
+                .to_string()
+        ));
         let responses = join_all(requests).await;
+        pb.set_message(format!(
+            "{}",
+            style("Finished call").cyan().bold().dim().to_string()
+        ));
         let mut bulk_responses = vec![];
         for ele in responses {
             if ele.is_ok() {
-                pb.set_message("Parsing responses...");
+                pb.set_message(
+                    style("Parsing responses...")
+                        .cyan()
+                        .bold()
+                        .dim()
+                        .to_string(),
+                );
                 let strval = ele.unwrap().text().await.unwrap();
                 let json: T = serde_json::from_str(strval.as_str()).expect("Error Deserializing");
                 bulk_responses.push(json);
@@ -93,8 +100,13 @@ impl PromisseSankhya {
             responses.push((count, ele));
             count = count + 1;
         }
-        let msg = format!("Imported {} rows", count - 1);
-        pb.finish_with_message(msg);
+        let msg = format!(
+            "{} {} {}",
+            style("Imported").green().dim().bold().to_string(),
+            count - 1,
+            style("rows").green().dim().bold().to_string()
+        );
+        pb.finish(msg);
         Ok(responses)
     }
 

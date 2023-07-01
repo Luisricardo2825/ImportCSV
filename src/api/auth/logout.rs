@@ -1,6 +1,8 @@
 use reqwest::Client;
 
-use crate::schemas::{logout_req_schema::LogoutRequestBody, logout_ret_schema::LogoutSchema};
+use crate::schemas::api::auth::{
+    logout_req_schema::LogoutRequestBody, logout_ret_schema::LogoutSchema,
+};
 
 pub async fn logout(client: &Client, url: &String) -> Result<LogoutSchema, String> {
     let json = LogoutRequestBody::new();
