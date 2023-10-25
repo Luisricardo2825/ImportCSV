@@ -165,7 +165,10 @@ impl SpreedsheetWorker {
                 .expect("O identificador deve ser um numero")
                 .to_string();
 
-            for (key, value) in object.as_object().unwrap() {
+            for (key, value) in object
+                .as_object()
+                .expect("Erro ao converte a planilha para JSON")
+            {
                 tuples.push((key.to_string(), value.to_owned()));
                 if hash_tuples.contains_key(&current_id) {
                     let new_arr = hash_tuples.get_mut(&current_id).unwrap();
