@@ -160,9 +160,9 @@ impl SpreedsheetWorker {
             let current_id = row
                 .local_fields
                 .get("@")
-                .unwrap()
+                .expect("Identificador \"@\" não encontraod0")
                 .as_f64()
-                .unwrap()
+                .expect("O identificador deve ser um numero")
                 .to_string();
 
             for (key, value) in object.as_object().unwrap() {
